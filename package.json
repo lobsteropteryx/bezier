@@ -1,0 +1,11 @@
+{
+  "name": "bezier",
+  "version": "1.0.0",
+  "description": "Simple functions for drawing curved polylines using ESRI JSAPI",
+  "main": "index.js",
+  "scripts": {
+    "test": "test"
+  },
+  "author": "Ian Firkin",
+  "license": "MIT"
+}

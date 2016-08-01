@@ -1,0 +1,170 @@
+<head>
+    <style>
+        body,
+        html {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+            margin: 0px;
+        }
+
+        #search {
+            display: block;
+            position: absolute;
+            z-index: 2;
+            top: 20px;
+            left: 74px;
+        }
+
+    </style>
+    <link rel="stylesheet" href="https://js.arcgis.com/3.17/esri/css/esri.css">
+</head>
+
+<div id="search"></div>
+<div id="map"></div>
+
+<script type="text/javascript">
+    var dojoConfig = {
+        async: true
+    };
+</script>
+
+<script src="https://js.arcgis.com/3.17/"></script>
+
+<script>
+
+    require([
+        'esri/arcgis/utils',
+        'esri/layers/GraphicsLayer',
+        "esri/toolbars/edit",
+        'esri/graphic',
+        'esri/symbols/SimpleMarkerSymbol',
+        'esri/symbols/SimpleLineSymbol',
+        'esri/Color',
+        'esri/SpatialReference',
+        'esri/geometry/Point',
+        'esri/geometry/Extent',
+        'esri/geometry/Polyline',
+        'esri/geometry/mathUtils',
+        "dojo/dom-construct",
+        "dojo/_base/event"
+    ], function (arcgisUtils,
+                 GraphicsLayer,
+                 Edit,
+                 Graphic,
+                 SimpleMarkerSymbol,
+                 SimpleLineSymbol,
+                 Color,
+                 SpatialReference,
+                 Point,
+                 Extent,
+                 Polyline,
+                 mathUtils,
+                 domConstruct,
+                 event) {
+        var map;
+        var glMain = new GraphicsLayer();
+        var sms = new SimpleMarkerSymbol()
+                .setSize(30)
+                .setStyle(SimpleMarkerSymbol.STYLE_CIRCLE)
+                .setColor(new Color([255, 0, 0, 0.5]));
+        var lineSymbol = new SimpleLineSymbol(
+                SimpleLineSymbol.STYLE_SOLID,
+                new Color([255, 0, 0]),
+                3
+        );
+
+        var addPoint = function (x, y, srid) {
+            var pt = new Point(x, y, srid);
+            var graphic = new Graphic(pt, sms);
+            glMain.add(graphic);
+            return pt;
+        };
+
+        var bez = {
+            _buildGeodesicLine: function (p1, p2, symbol, curvature) {
+                var points = this._getBezierPoints(p1, p2, 20, curvature);
+                var line = new Polyline(p1.spatialReference);
+                var newPoints = points.map(function (p) {
+                    return new Point(p.x, p.y, p1.spatialReference);
+                });
+                line.addPath(newPoints);
+                return new Graphic(line, symbol);
+            },
+
+            _getBezierPoints: function (p1, p2, n, curvature) {
+                var c = this._getBezierPoint(p1, p2, curvature);
+                var length = mathUtils.getLength(p1, p2);
+                var increment = length / n;
+                var newPoints = [];
+                var i;
+                for (i = 1; i <= n+1; i++) {
+                    newPoints.push(
+                        this._getBezierPointAtT(p1, c, p2, ((i - 1) * increment / length))
+                    );
+                }
+                return newPoints;
+            },
+
+            _getBezierPointAtT: function (p0, p1, p2, t) {
+                return {
+                    x: (1 - t) * (1 - t) * p0.x + 2 * (1 - t) * t * p1.x + t * t * p2.x,
+                    y: (1 - t) * (1 - t) * p0.y + 2 * (1 - t) * t * p1.y + t * t * p2.y
+                };
+            },
+
+            _getBezierPoint: function (p0, p1, curvature) {
+                var midpoint = {x: (p1.x + p0.x) / 2, y: (p1.y + p0.y) / 2};
+                return this._getNormalVector(p0, midpoint, curvature);
+            },
+
+            _getNormalVector: function (p0, p1, curvature) {
+                var dx, dy, dist, N;
+                dx = p0.x - p1.x;
+                dy = p0.y - p1.y;
+                dist = Math.sqrt(dx*dx + dy*dy);
+                dx = dx/dist;
+                dy = dy/dist;
+                N = mathUtils.getLength(p0, p1) * curvature;
+                return {x: p1.x - (N)*dy, y: p1.y + (N)*dx};
+            }
+        };
+
+        var sr = new SpatialReference(102100);
+        var p1 = addPoint(-10536485, 3662075.5279079974, sr);
+        var p2 = addPoint(-10536485, 3675419.2240811125, sr);
+
+        glMain.add(bez._buildGeodesicLine(p1, p2, lineSymbol, 0.1));
+
+        var createMapOptions = {
+            mapOptions: {
+                slider: true,
+                extent: new Extent({
+                    xmax: -10516432.231386047,
+                    xmin: -10554650.745528582,
+                    ymax: 3683431.275450044,
+                    ymin: 3665659.6663737646,
+                    "spatialReference": {"wkid": 102100}
+                })
+            },
+            geometryServiceURL: "http://sampleserver3.arcgisonline.com/ArcGIS/rest/services/Geometry/GeometryServer"
+        };
+
+        var webMapItemID = "623c6136154d4a1bbbfecab6f01c48a4"; // blank map
+        var deferred = arcgisUtils.createMap(webMapItemID, "map", createMapOptions);
+        deferred.then(function (response) {
+            map = response.map;
+            map.addLayers([glMain]);
+        }, function (error) {
+            console.log("Error: ", error.code, " Message: ", error.message);
+            deferred.cancel();
+        });
+    });
+
+</script>
